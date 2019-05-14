@@ -299,7 +299,8 @@ def oauth_login():
     if get_config("user_mode") == "teams":
         scope = "profile team"
     else:
-        scope = "profile"
+        #scope = "profile"
+        scope = "identify%20email" #<---- FIX FOR DISCORD OAUTH REQUIREMENTS
 
     client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id")
 
@@ -311,7 +312,8 @@ def oauth_login():
         )
         return redirect(url_for("auth.login"))
 
-    redirect_url = "{endpoint}?response_type=code&client_id={client_id}&scope={scope}&state={state}".format(
+    redirect_url = "{endpoint}?response_type=code&client_id={client_id}&scope={scope}&state={state}".format( 
+
         endpoint=endpoint, client_id=client_id, scope=scope, state=session["nonce"]
     )
     return redirect(redirect_url)
@@ -362,28 +364,28 @@ def oauth_redirect():
             api_data = requests.get(url=user_url, headers=headers).json()
 
             user_id = api_data["id"]
-            user_name = api_data["name"]
+            user_name = api_data["username"] #<---- CHANGE FOR DISCORD OAUTH FORMATTING
             user_email = api_data["email"]
 
             user = Users.query.filter_by(email=user_email).first()
             if user is None:
                 # Check if we are allowing registration before creating users
-                if registration_visible():
-                    user = Users(
-                        name=user_name,
-                        email=user_email,
-                        oauth_id=user_id,
-                        verified=True,
-                    )
-                    db.session.add(user)
-                    db.session.commit()
-                else:
-                    log("logins", "[{date}] {ip} - Public registration via MLC blocked")
-                    error_for(
-                        endpoint="auth.login",
-                        message="Public registration is disabled. Please try again later.",
-                    )
-                    return redirect(url_for("auth.login"))
+               # if registration_visible(): # < - FIX FOR LHC DISCORD OAUTH TO ALLOW NEW USERS WITHOUT ALLOWING MANUAL REG
+                user = Users(
+                    name=user_name,
+                    email=user_email,
+                    oauth_id=user_id,
+                    verified=True,
+                )
+                db.session.add(user)
+                db.session.commit()
+                #else: # < - FIX FOR LHC DISCORD OAUTH TO ALLOW NEW USERS VIA OAUTH BUT NOT USERNAME
+                #    log("logins", "[{date}] {ip} - Public registration via MLC blocked")
+                #    error_for(
+                #        endpoint="auth.login",
+                #        message="Public registration is disabled. Please try again later.",
+                #    )
+                #    return redirect(url_for("auth.login"))
 
             if get_config("user_mode") == TEAMS_MODE:
                 team_id = api_data["team"]["id"]
